@@ -1,0 +1,10 @@
+run:
+  provider: tidl
+  onnx: ../artifacts/model.onnx
+  image: ../test_images/img_0001_image.tif
+  output: ../artifacts/outputs/tidl_mask.png
+  artifacts_folder: ../artifacts/tidl/model-artifacts/square_seg
+  tidl_tools_path: /usr/lib
+  threshold: 0.99
+  height: 128
+  width: 128

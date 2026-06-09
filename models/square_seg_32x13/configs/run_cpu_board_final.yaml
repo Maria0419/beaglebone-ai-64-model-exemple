@@ -1,0 +1,8 @@
+run:
+  provider: cpu
+  onnx: ../artifacts/model.onnx
+  image: ../test_images/img_0001_image.tif
+  output: ../artifacts/outputs/cpu_mask.png
+  threshold: 0.01
+  height: 128
+  width: 128

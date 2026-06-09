@@ -1,0 +1,9 @@
+{
+  "onnx": "configs/../artifacts/model.onnx",
+  "ops": [
+    "Conv",
+    "Relu"
+  ],
+  "opset": 11,
+  "max_abs_diff_torch_vs_ort": 0.00014495849609375
+}

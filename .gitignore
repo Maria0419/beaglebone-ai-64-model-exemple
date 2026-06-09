@@ -1,0 +1,11 @@
+__pycache__/
+*.py[cod]
+.venv/
+.env
+*.log
+*.aux
+*.fls
+*.fdb_latexmk
+*.out
+.DS_Store
+**/artifacts/tidl/model-artifacts/*/tempDir/

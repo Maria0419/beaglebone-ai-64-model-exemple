@@ -1,0 +1,21 @@
+# Generic TIDL 8.2 ONNX compile template.
+# Copy this file and edit the paths for another model.
+
+image_height: 128
+image_width: 128
+
+compile:
+  onnx: ../artifacts/model.onnx
+  artifacts_folder: ../artifacts/tidl/model-artifacts/my_model
+  tidl_tools_path: ../tools/tidl82/tidl_tools
+
+  # Calibration images are passed through the model during TIDL import.
+  # Labels are not required for compilation.
+  calibration_dir: /path/to/calibration/images
+  calibration_glob: "*.tif"
+  calibration_frames: 128
+
+  tidl_platform: J7
+  tidl_version: "8.2"
+  tidl_tensor_bits: 8
+  tidl_accuracy_level: 1

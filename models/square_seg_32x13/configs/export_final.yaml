@@ -1,0 +1,8 @@
+train_config: train.yaml
+
+export:
+  checkpoint: ../artifacts/checkpoints/best.pt
+  output: ../artifacts/model.onnx
+  opset: 11
+  tolerance: 0.01
+  skip_ort_check: false

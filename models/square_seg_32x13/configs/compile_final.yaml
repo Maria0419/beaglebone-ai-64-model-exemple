@@ -1,0 +1,11 @@
+train_config: train.yaml
+
+compile:
+  onnx: ../artifacts/model.onnx
+  artifacts_folder: ../artifacts/tidl/model-artifacts/square_seg
+  tidl_tools_path: /opt/tidl_tools
+  calibration_dir: /home/maria/Project/ia/models/data/data/train
+  calibration_glob: "*_image.tif"
+  calibration_frames: 128
+  tidl_tensor_bits: 8
+  tidl_accuracy_level: 1

@@ -8,8 +8,8 @@ Usage:
   scripts/tidl82_onnx_compile.sh -- <custom command inside container>
 
 Examples:
-  scripts/tidl82_onnx_compile.sh models/square_seg_32x13/configs/compile_final.yaml
-  scripts/tidl82_onnx_compile.sh -- python3 tools/compile_tidl.py --config models/square_seg_32x13/configs/compile_final.yaml
+  scripts/tidl82_onnx_compile.sh models/square_seg_32x13/configs/compile.yaml
+  scripts/tidl82_onnx_compile.sh -- python3 tools/compile_tidl.py --config models/square_seg_32x13/configs/compile.yaml
 
 Environment variables:
   TIDL82_IMAGE       Docker image name. Default: tidl82-onnx-compiler:08_02_00_01_rc1
@@ -21,7 +21,7 @@ EOF
 PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 IMAGE_NAME="${TIDL82_IMAGE:-tidl82-onnx-compiler:08_02_00_01_rc1}"
 DATA_DIR="${DATA_DIR:-}"
-CONFIG_PATH="configs/compile_final.yaml"
+CONFIG_PATH="configs/compile.yaml"
 CUSTOM_CMD=()
 
 if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then

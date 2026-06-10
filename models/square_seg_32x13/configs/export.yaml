@@ -1,11 +1,11 @@
 # Final ONNX export preset for the example training pipeline.
-# `train_config` loads shared fields such as image size and model architecture from
+# `train_config` loads shared fields such as image size and the model block from
 # train.yaml. The `export:` section below only contains values specific to the export step.
 train_config: train.yaml
 
 export:
-  # ONNX file consumed later by compile_final.yaml and board-side inference presets.
-  output: ../outputs/model.onnx
+  # ONNX file consumed later by compile.yaml and board-side inference presets.
+  output: ../artifacts/model.onnx
 
   # Opset validated against the TIDL 8.2 flow used by this repository.
   opset: 11

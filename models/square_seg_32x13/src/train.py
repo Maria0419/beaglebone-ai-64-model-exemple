@@ -46,7 +46,7 @@ def run_epoch(
     batch_count = 0
 
     progress = tqdm(loader, desc=f"Epoch {epoch}/{total_epochs} [{stage}]", leave=False)
-    
+
     for images, masks in progress:
         images = images.to(device)
         masks = masks.to(device)
@@ -95,8 +95,8 @@ def main():
     config_path = Path(args.config)
     cfg = yaml.safe_load(config_path.read_text())
 
-    outputs_dir = Path(cfg["artifacts_dir"])
-    outputs_dir.mkdir(parents=True, exist_ok=True)
+    artifacts_dir = Path(cfg["artifacts_dir"])
+    artifacts_dir.mkdir(parents=True, exist_ok=True)
 
     image_height = cfg["image_height"]
     image_width = cfg["image_width"]
@@ -116,11 +116,16 @@ def main():
     print(f"Training data: {len(train_dataset)}  Testing data: {len(test_dataset)}")
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    
+
     train_loader = DataLoader(train_dataset, batch_size=cfg["batch_size"], shuffle=True, num_workers=cfg["num_workers"])
     test_loader = DataLoader(test_dataset, batch_size=cfg.get("eval_batch_size", cfg["batch_size"]), shuffle=False, num_workers=cfg["num_workers"])
 
-    model = build_model(channels=cfg["channels"], layers=cfg["layers"], kernel_size=cfg["kernel_size"]).to(device)
+    model = build_model(
+        cfg.get("model"),
+        channels=cfg.get("channels"),
+        layers=cfg.get("layers"),
+        kernel_size=cfg.get("kernel_size"),
+    ).to(device)
 
     criterion = DiceBCELoss(
         bce_weight=float(cfg.get("bce_loss_weight", 1.0)),
@@ -185,7 +190,7 @@ def main():
             "metrics": row,
             "history": history,
         }
-        torch.save(model_state, outputs_dir / "model.pt")
+        torch.save(model_state, artifacts_dir / "model.pt")
 
         if test_metrics["iou"] > best_iou:
             best_iou = float(test_metrics["iou"])
@@ -201,7 +206,7 @@ def main():
                 }, sort_keys=True), flush=True)
                 break
 
-    (outputs_dir / "metrics.json").write_text(json.dumps(history, indent=2))
+    (artifacts_dir / "metrics.json").write_text(json.dumps(history, indent=2))
 
 
 if __name__ == "__main__":

@@ -6,11 +6,11 @@ train_config: train.yaml
 
 compile:
   # ONNX file produced by:
-  #   python3 src/export_onnx.py --config models/square_seg_32x13/configs/export_final.yaml
-  onnx: ../outputs/model.onnx
+  #   python3 src/export_onnx.py --config models/square_seg_32x13/configs/export.yaml
+  onnx: ../artifacts/model.onnx
 
   # Destination recreated on each compile unless --keep-artifacts is passed.
-  artifacts_folder: ../outputs/tidl/model-artifacts/square_seg
+  artifacts_folder: ../artifacts/tidl/model-artifacts/square_seg
 
   # Path to the extracted TIDL 8.2 host tools inside the compiler container.
   tidl_tools_path: /opt/tidl_tools

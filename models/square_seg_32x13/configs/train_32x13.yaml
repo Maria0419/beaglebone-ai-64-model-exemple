@@ -6,15 +6,19 @@ train_dir: /home/maria/Project/ia/models/data/data/train
 test_dir: /home/maria/Project/ia/models/data/data/test
 
 # Candidate-specific output root. This run writes model.pt and metrics.json
-# under outputs/candidates/32x13/.
-artifacts_dir: outputs/candidates/32x13
+# under artifacts/candidates/32x13/.
+artifacts_dir: artifacts/candidates/32x13
 
-# Architecture used by the final deployed candidate.
 image_height: 128
 image_width: 128
-channels: 32
-layers: 13
-kernel_size: 3
+
+# Model selection for the final deployed candidate.
+model:
+  name: square_seg
+  params:
+    channels: 32
+    layers: 13
+    kernel_size: 3
 
 # Training schedule used for the selected candidate run.
 epochs: 14

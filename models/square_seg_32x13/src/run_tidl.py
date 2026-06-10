@@ -52,27 +52,28 @@ def main():
     if config_path is not None:
         config_path, _, cfg = load_config_with_base(config_path, "run")
 
-    onnx_default = cfg.get("onnx", "outputs/model.onnx")
+    onnx_default = cfg.get("onnx", "artifacts/model.onnx")
     image_default = cfg.get("image")
-    output_default = cfg.get("output", "outputs/mask.png")
+    output_default = cfg.get("output", "artifacts/mask.png")
     provider = args.provider or cfg.get("provider", "tidl")
-    artifacts_folder_default = cfg.get("artifacts_folder", "outputs/tidl/model-artifacts/square_seg")
+    artifacts_folder_default = cfg.get("artifacts_folder", "artifacts/tidl/model-artifacts/square_seg")
     tidl_tools_default = cfg.get("tidl_tools_path") or os.environ.get("TIDL_TOOLS_PATH", "/usr/lib")
     height = int(args.height or cfg.get("height") or cfg.get("image_height", 128))
     width = int(args.width or cfg.get("width") or cfg.get("image_width", 128))
     threshold = float(args.threshold if args.threshold is not None else cfg.get("threshold", 0.5))
 
+    artifacts_requested = args.artifacts_folder or artifacts_folder_default
     if config_path is not None:
         onnx_path = resolve_path(config_path, args.onnx or onnx_default)
         image_path = resolve_path(config_path, args.image or image_default)
         output_path = resolve_path(config_path, args.output or output_default)
-        artifacts_folder = resolve_path(config_path, args.artifacts_folder or artifacts_folder_default)
+        artifacts_folder = resolve_path(config_path, artifacts_requested)
         tidl_tools_path = resolve_path(config_path, args.tidl_tools_path or tidl_tools_default)
     else:
         onnx_path = Path(args.onnx or onnx_default)
         image_path = Path(args.image or image_default) if (args.image or image_default) else None
         output_path = Path(args.output or output_default)
-        artifacts_folder = Path(args.artifacts_folder or artifacts_folder_default)
+        artifacts_folder = Path(artifacts_requested)
         tidl_tools_path = Path(args.tidl_tools_path or tidl_tools_default)
 
     if onnx_path is None or image_path is None or output_path is None or artifacts_folder is None or tidl_tools_path is None:

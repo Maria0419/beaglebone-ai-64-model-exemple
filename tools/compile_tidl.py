@@ -56,15 +56,16 @@ def main() -> None:
     height = int(cfg["image_height"])
     width = int(cfg["image_width"])
     channels = int(cfg.get("image_channels", 1))
-    channels = int(cfg.get("image_channels", 1))
     default_model = cfg.get("onnx")
-    if default_model is None and "artifacts_dir" in cfg:
-        default_model = Path(cfg["artifacts_dir"]) / "model.onnx"
+    artifacts_root = cfg.get("artifacts_dir")
+    if default_model is None and artifacts_root is not None:
+        default_model = Path(artifacts_root) / "model.onnx"
     default_artifacts = cfg.get("artifacts_folder")
-    if default_artifacts is None and "artifacts_dir" in cfg:
-        default_artifacts = Path(cfg["artifacts_dir"]) / "tidl" / "model-artifacts" / "square_seg"
+    if default_artifacts is None and artifacts_root is not None:
+        default_artifacts = Path(artifacts_root) / "tidl" / "model-artifacts" / "square_seg"
     model_path = resolve_path(config_path, args.onnx or default_model)
-    artifacts_folder = resolve_path(config_path, args.artifacts_folder or default_artifacts)
+    requested_artifacts = args.artifacts_folder or default_artifacts
+    artifacts_folder = resolve_path(config_path, requested_artifacts)
     tidl_tools_path = resolve_path(config_path, args.tidl_tools_path or cfg.get("tidl_tools_path") or os.environ.get("TIDL_TOOLS_PATH"))
     if model_path is None or artifacts_folder is None:
         raise ValueError("onnx and artifacts_folder must resolve to real paths")
@@ -118,7 +119,6 @@ def main() -> None:
         "model": str(model_path),
         "artifacts_folder": str(artifacts_folder),
         "calibration_frames": len(calibration_images),
-        "image_shape": [1, channels, height, width],
         "image_shape": [1, channels, height, width],
         "providers": session.get_providers(),
         "delegate_options": delegate_options,

@@ -6,6 +6,7 @@ The generic part of this repository is the TIDL 8.2 compiler environment:
 
 - `docker/tidl82/Dockerfile`: Ubuntu 18.04 / Python 3.6 / `onnxruntime_tidl 1.7.0` / `tidl_tools 08_02_00_01-rc1`.
 - `scripts/tidl82_onnx_compile.sh`: generic Docker wrapper for TIDL 8.2 ONNX compilation.
+- `scripts/tidl82_export_compile.sh`: one-command wrapper that exports ONNX on the host and then runs the TIDL compile wrapper.
 - `tools/compile_tidl.py`: YAML-driven ONNX compile script.
 - `examples/compile_tidl82_template.yaml`: starting point for compiling another model.
 
@@ -56,13 +57,13 @@ Expected ONNX Runtime version inside the container is `1.7.0`.
 
 ## Compile the Included Example
 
-The square segmentation example already includes `model.onnx` and precompiled TIDL artifacts. To recompile it on the host:
+The square segmentation example already includes `model.onnx` and precompiled TIDL artifacts. To re-export the ONNX and then recompile it on the host with one command:
 
 ```bash
-./scripts/tidl82_onnx_compile.sh models/square_seg_32x13/configs/compile_final.yaml
+./scripts/tidl82_export_compile.sh models/square_seg_32x13/configs/compile.yaml
 ```
 
-The compile YAML selects the ONNX model, calibration images, input size, and output artifact directory. If `calibration_dir` is an absolute host path, the wrapper mounts it read-only into the container automatically.
+By default this wrapper infers the sibling `export.yaml` next to the compile YAML, runs the host-side ONNX export first, and then calls the Docker-based TIDL compile wrapper. The compile YAML still selects the calibration images, input size, and output artifact directory. If `calibration_dir` is an absolute host path, the wrapper mounts it read-only into the container automatically.
 
 ## Compile Another ONNX Model
 
@@ -81,8 +82,8 @@ This compiler helper is generic for fixed-shape image ONNX models using 1-channe
 For the included example, copy `models/square_seg_32x13/` to the board and run from that folder:
 
 ```bash
-python3 src/run_tidl.py --config configs/run_cpu_board_final.yaml
-sudo python3 src/run_tidl.py --config configs/run_tidl_final.yaml
+python3 src/run_tidl.py --config configs/run_cpu_board.yaml
+sudo python3 src/run_tidl.py --config configs/run_tidl.yaml
 ```
 
 The TIDL run should show `TIDLExecutionProvider` and one offloaded subgraph.

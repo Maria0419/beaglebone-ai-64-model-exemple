@@ -22,9 +22,9 @@ def main():
     args = parser.parse_args()
 
     config_path, _, cfg = load_config_with_base(args.config, "export")
-    outputs_dir = Path(cfg["artifacts_dir"])
-    model_path = outputs_dir / "model.pt"
-    default_output = cfg.get("output", outputs_dir / "model.onnx")
+    artifacts_dir = Path(cfg["artifacts_dir"])
+    model_path = artifacts_dir / "model.pt"
+    default_output = cfg.get("output", artifacts_dir / "model.onnx")
     output_path = resolve_path(config_path, args.output or default_output)
     opset = int(args.opset or cfg.get("opset", 11))
     tolerance = float(args.tolerance if args.tolerance is not None else cfg.get("tolerance", 1e-4))
@@ -36,9 +36,10 @@ def main():
     model_state = torch.load(model_path, map_location="cpu")
     ckpt_cfg = model_state.get("config", cfg)
     model = build_model(
-        channels=int(ckpt_cfg.get("channels", cfg["channels"])),
-        layers=int(ckpt_cfg.get("layers", cfg.get("layers", 15))),
-        kernel_size=int(ckpt_cfg.get("kernel_size", cfg.get("kernel_size", 5))),
+        ckpt_cfg.get("model", cfg.get("model")),
+        channels=ckpt_cfg.get("channels", cfg.get("channels")),
+        layers=ckpt_cfg.get("layers", cfg.get("layers")),
+        kernel_size=ckpt_cfg.get("kernel_size", cfg.get("kernel_size")),
     )
     model.load_state_dict(model_state["model_state"])
     model.eval()
@@ -81,7 +82,7 @@ def main():
         if max_abs_diff > tolerance:
             raise RuntimeError(f"PyTorch and ONNX Runtime outputs differ: max_abs_diff={max_abs_diff}")
 
-    (outputs_dir / "onnx_report.json").write_text(json.dumps(report, indent=2))
+    (artifacts_dir / "onnx_report.json").write_text(json.dumps(report, indent=2))
     print(json.dumps(report, indent=2))
 
 

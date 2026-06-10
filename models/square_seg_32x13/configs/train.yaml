@@ -7,16 +7,20 @@ test_dir: /home/maria/Project/ia/models/data/data/test
 
 # Root output directory used by this example model.
 # Training writes model.pt and metrics here.
-artifacts_dir: outputs
+artifacts_dir: artifacts
 
 # Input tensor size expected by the model and by the exported ONNX graph.
 image_height: 128
 image_width: 128
 
-# Model architecture. Edit these values in this file to change which model the example trains.
-channels: 32
-layers: 13
-kernel_size: 3
+# Model selection. Change `name` when the example is extended with another builder,
+# and edit only the parameters used by that selected model.
+model:
+  name: square_seg
+  params:
+    channels: 32
+    layers: 13
+    kernel_size: 3
 
 # Optimization settings for src/train.py.
 epochs: 8

@@ -1,0 +1,590 @@
+
+\documentclass[11pt,a4paper]{article}
+\usepackage[margin=2.1cm]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{tabularx}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{listings}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{float}
+\usepackage{amsmath}
+
+\hypersetup{colorlinks=true, linkcolor=black, urlcolor=blue}
+\graphicspath{{figures/}}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.55em}
+\emergencystretch=2em
+
+\lstset{
+  basicstyle=\ttfamily\small,
+  breaklines=true,
+  frame=single,
+  columns=fullflexible,
+  keepspaces=true,
+  showstringspaces=false
+}
+
+\title{Square Segmentation on BeagleBone AI-64 with TIDL 8.2\\Setup Tutorial, Model Report, and Run Guide}
+\author{Project documentation}
+\date{June 9, 2026}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+This document shows the BeagleBone AI-64 TIDL setup tutorial and the final square-segmentation model report.  It covers flashing the correct image, validating the TIDL runtime, designing a TIDL 8.2-compatible ONNX graph, compiling with \texttt{08\_02\_00\_01-rc1}, deploying to the board, running inference through YAML files, and comparing CPU versus TIDL accuracy and latency.  The selected model is a fully convolutional ONNX graph using only \texttt{Conv} and \texttt{Relu}.
+
+The source repository is available at \href{https://github.com/maria0419/beaglebone-ai-64-model-exemple}{github.com/maria0419/beaglebone-ai-64-model-exemple}.  The repository keeps the BeagleBone/TIDL 8.2 compiler flow generic and places this square segmentation model under \path{models/square_seg_32x13/} as one example model.
+\end{abstract}
+
+\section{Flash the Correct Image to eMMC}
+
+Use the official BeagleBoard image: \href{https://www.beagleboard.org/distros/beaglebone-ai-64-xfce-2023-08-05-emmc-flasher}{BeagleBone AI-64 Debian 11.7 2023-08-05 10GB Xfce eMMC Flasher}.
+
+\begin{lstlisting}
+BeagleBoard.org Debian Bullseye Xfce Image 2023-08-05
+\end{lstlisting}
+
+This image was selected because it is the most up-to-date image that already includes the BeagleBone AI-64 EdgeAI/TIDL runtime compatible with the TIDL 8.2 workflow. The eMMC flashing procedure was as follows:
+
+\begin{enumerate}
+\item Write the image to a microSD card.
+\item Insert the microSD card into the BeagleBone AI-64.
+\item Hold the boot button.
+\item Power the board while holding the boot button during the start of boot.
+\item Leave the board flashing the eMMC for about 15 minutes.
+\item Power off the board, remove the microSD card, and boot again from eMMC.
+\end{enumerate}
+
+After boot, the board responded over SSH at:
+
+\begin{lstlisting}
+192.168.7.2
+192.168.6.2
+\end{lstlisting}
+
+The default user for this image is:
+
+\begin{lstlisting}
+user: debian
+password: temppwd
+\end{lstlisting}
+
+\section{Board Runtime Check}
+
+Confirm ONNX Runtime and the TIDL providers on the board:
+
+\begin{lstlisting}[language=bash]
+python3 -c "import onnxruntime as ort; print(ort.__version__); print(ort.get_available_providers())"
+\end{lstlisting}
+
+Expected for the image used in this project:
+
+\begin{lstlisting}
+1.7.0
+['TIDLExecutionProvider', 'TIDLCompilationProvider', 'CPUExecutionProvider']
+\end{lstlisting}
+
+Confirm that the TIDL provider library exists:
+
+\begin{lstlisting}[language=bash]
+find /usr -name 'libtidl_onnxrt_EP.so' 2>/dev/null
+\end{lstlisting}
+
+Expected:
+
+\begin{lstlisting}
+/usr/lib/libtidl_onnxrt_EP.so
+\end{lstlisting}
+
+\section{Board and Host Version Match}
+
+The TIDL compilation flow starts from the board runtime, not from the host.  On the image selected in the flashing step, ONNX Runtime reported version 1.7.0 and these providers:
+
+\begin{lstlisting}
+TIDLExecutionProvider
+TIDLCompilationProvider
+CPUExecutionProvider
+\end{lstlisting}
+
+Because the board runtime is fixed by that image, the host must compile the model with the matching TIDL 8.2 tools.  The host-side stack used for this board image was:
+
+\begin{lstlisting}
+edgeai-tidl-tools / tidl_tools 08_02_00_01-rc1
+onnxruntime_tidl 1.7.0
+Python 3.6 inside the compile container
+\end{lstlisting}
+
+\subsection{Host Setup and Reproduction Flow}
+
+On a fresh Debian or Ubuntu host, install Docker first:
+
+\begin{lstlisting}[language=bash]
+sudo apt update
+sudo apt install -y docker.io
+sudo systemctl enable --now docker
+sudo usermod -aG docker $USER
+\end{lstlisting}
+
+After adding the user to the \texttt{docker} group, log out and log in again so the new group membership is applied.  Then verify Docker without \texttt{sudo}:
+
+\begin{lstlisting}[language=bash]
+docker info
+\end{lstlisting}
+
+Download and extract the TIDL 8.2 host tools used by this project:
+
+\begin{lstlisting}[language=bash]
+mkdir -p downloads tools/tidl82
+wget -O downloads/tidl_tools_08_02_00_01_rc1.tar.gz \
+  https://github.com/TexasInstruments/edgeai-tidl-tools/releases/download/08_02_00_01-rc1/tidl_tools.tar.gz
+tar -xzf downloads/tidl_tools_08_02_00_01_rc1.tar.gz -C tools/tidl82
+\end{lstlisting}
+
+Verify that the extracted tools contain the ONNX Runtime TIDL provider libraries:
+
+\begin{lstlisting}[language=bash]
+test -f tools/tidl82/tidl_tools/libtidl_onnxrt_EP.so
+test -f tools/tidl82/tidl_tools/tidl_model_import_onnx.so
+\end{lstlisting}
+
+Build the TIDL 8.2 compile container once:
+
+\begin{lstlisting}[language=bash]
+docker build -t tidl82-onnx-compiler:08_02_00_01_rc1 docker/tidl82
+\end{lstlisting}
+
+The container is needed because the \texttt{onnxruntime\_tidl} wheel for this release targets Python 3.6.  The wrapper itself is model-agnostic; the YAML file selects the already-exported ONNX model, the calibration images, and the output directory.
+
+The final square segmentation artifacts are produced in this order:
+
+\begin{enumerate}
+\item Train the example with \texttt{python3 src/train.py --config configs/train.yaml}.  This writes \texttt{artifacts/model.pt} and \texttt{artifacts/metrics.json}.  The model itself is defined inside the \texttt{model:} block in \texttt{configs/train.yaml}; changing \texttt{model.name} and \texttt{model.params} changes which model is trained.
+\item Re-export and compile with \texttt{./scripts/tidl82\_export\_compile.sh configs/compile\_final.yaml}.  This wrapper first exports \texttt{artifacts/model.onnx} from \texttt{artifacts/model.pt} on the host, then compiles that ONNX and writes \path{artifacts/tidl/model-artifacts/square\_seg/}.
+\end{enumerate}
+
+For another ONNX model, copy \path{configs/compile_tidl82_template.yaml}, edit the ONNX path, calibration image directory, input size, and output directory, then pass that YAML to the same wrapper.  If \texttt{calibration\_dir} is an absolute host path, the wrapper mounts it read-only into the container automatically.  For the square segmentation model, the one-command wrapper eventually calls the compiler script with the final compile preset inside the container:
+
+\begin{lstlisting}[language=bash]
+python3 tools/compile_tidl.py --config models/square_seg_32x13/configs/compile.yaml
+\end{lstlisting}
+
+\section{Dataset}
+
+The dataset contains grayscale TIFF image/mask pairs:
+
+\begin{table}[H]
+\centering
+\caption{Dataset and tensor format.}
+\begin{tabular}{ll}
+\toprule
+Item & Value \\
+\midrule
+Training set & 20,000 pairs \\
+Test set & 5,000 pairs \\
+Input image & $128\times128$, grayscale TIFF \\
+Mask & binary, $0/255$ TIFF \\
+Input tensor & $1\times1\times128\times128$, NCHW, float32 in $[0,1]$ \\
+Output tensor & logits, $1\times1\times128\times128$ \\
+Post-processing & sigmoid outside ONNX, then threshold \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Final Model}
+
+The selected architecture was not the highest floating-point model overall.  It was the model that preserved the best mask quality after TIDL INT8 quantization on the real board.
+
+\begin{table}[H]
+\centering
+\caption{Final deployed model configuration.}
+\begin{tabular}{ll}
+\toprule
+Parameter & Value \\
+\midrule
+Architecture & fully convolutional CNN \\
+Hidden channels & 32 \\
+Convolutional layers & 13 total layers \\
+Kernel size & $3\times3$ for hidden layers \\
+Final layer & $1\times1$ convolution to one logit channel \\
+Activations & ReLU only \\
+Allowed ONNX ops & \texttt{Conv}, \texttt{Relu} \\
+Export opset & 11 \\
+TIDL tensor bits & 8 \\
+Calibration frames & 128 \\
+Measured CPU threshold & 0.01 \\
+Measured TIDL threshold & 0.99 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The ONNX export check reported only \texttt{Conv} and \texttt{Relu}, with maximum absolute difference between PyTorch and ONNX Runtime CPU of $1.4496\times10^{-4}$ on the export check tensor.
+
+The exported ONNX file is:
+
+\begin{lstlisting}
+artifacts/model.onnx
+SHA256: 2ce83ab587844385590c5419eede2fb924a79099c064bc154399ee78e3eff328
+\end{lstlisting}
+
+The final TIDL artifact hashes are:
+
+\begin{lstlisting}
+logits_tidl_net.bin
+SHA256: 7cb39a232519374bbbe410ed441c8516acc8e6674c0de28c2c06076ffb5f95b7
+
+logits_tidl_io_1.bin
+SHA256: e79ce3232e2ffa511bc895e032e011cb0d52bfa051e632f53d387f05f43dfa76
+\end{lstlisting}
+
+
+\section{Build a TIDL-Compatible ONNX Graph}
+
+The most important engineering constraint is not just training accuracy.  The graph must be simple enough for TIDL 8.2 to compile and offload on the BeagleBone AI-64 runtime.  The practical rules used were:
+
+\begin{itemize}
+\item use fixed input shape in NCHW format, here \texttt{1x1x128x128},
+\item keep the output fixed and leave post-processing outside the graph,
+\item export logits or raw tensors instead of embedding thresholding in ONNX,
+\item avoid dynamic shape logic,
+\item avoid operators that commonly break offload or force partial CPU fallback.
+\end{itemize}
+
+The safe starting operator set for this project was:
+
+\begin{lstlisting}
+Conv
+Relu
+\end{lstlisting}
+
+Operators intentionally avoided in the final ONNX graph were:
+
+\begin{lstlisting}
+Resize
+Upsample
+ConvTranspose
+Flatten
+Gemm
+MatMul
+Sigmoid
+Softmax
+ArgMax
+NonMaxSuppression
+\end{lstlisting}
+
+Sigmoid and threshold are applied in Python after inference.  This keeps the model graph small and maximizes the chance that TIDL creates one fully offloaded subgraph.
+
+\section{Export ONNX with Opset 11}
+
+The export uses a fixed-shape dummy tensor and opset 11.  For PyTorch versions with the newer exporter, the legacy exporter can be forced when needed:
+
+\begin{lstlisting}[language=Python]
+torch.onnx.export(
+    model,
+    dummy_input,
+    "artifacts/model.onnx",
+    export_params=True,
+    opset_version=11,
+    do_constant_folding=True,
+    input_names=["input"],
+    output_names=["logits"],
+    dynamic_axes=None,
+    dynamo=False,
+    external_data=False,
+)
+\end{lstlisting}
+
+Validate the exported graph:
+
+\begin{lstlisting}[language=bash]
+python3 -c "import onnx; m=onnx.load('artifacts/model.onnx'); onnx.checker.check_model(m); print([(o.domain,o.version) for o in m.opset_import]); print(sorted({n.op_type for n in m.graph.node}))"
+\end{lstlisting}
+
+The expected result for this project is:
+
+\begin{lstlisting}
+[('', 11)]
+['Conv', 'Relu']
+\end{lstlisting}
+
+A CPU ONNX Runtime smoke test should also be run on the host before TIDL compilation:
+
+\begin{lstlisting}[language=bash]
+python3 -c "import numpy as np, onnxruntime as ort; x=np.zeros((1,1,128,128),dtype=np.float32); s=ort.InferenceSession('artifacts/model.onnx',providers=['CPUExecutionProvider']); y=s.run(None,{s.get_inputs()[0].name:x})[0]; print(y.shape, y.dtype)"
+\end{lstlisting}
+
+\section{YAML Workflow}
+
+The workflow was simplified so that long command-line argument lists are no longer needed.  Table~\ref{tab:yaml-files} lists the YAML files in this example and what each one is for.
+
+\begin{table}[H]
+\centering
+\small
+\caption{YAML files used in the example workflow.}
+\label{tab:yaml-files}
+\begin{tabularx}{\linewidth}{p{0.30\linewidth} X}
+\toprule
+YAML file & What it is for \\
+\midrule
+\path{configs/train.yaml} & Main training preset. It defines dataset paths, shared training settings, and the \texttt{model:} block used by the generic example. \\
+\path{configs/train_32x13.yaml} & Candidate-specific training preset used to reproduce the selected 32x13 run. \\
+\path{configs/export.yaml} & ONNX export preset. It reads \texttt{artifacts/model.pt} and writes \texttt{artifacts/model.onnx}. \\
+\path{configs/compile.yaml} & TIDL compile preset. It selects the exported ONNX, calibration images, and the directory where the compiled TIDL artifacts are written. \\
+\path{configs/run_cpu_board.yaml} & CPU inference preset for the packaged example layout. \\
+\path{configs/run_tidl.yaml} & TIDL inference preset for the packaged example on the board. \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\section{Host-Side Commands}
+
+From the project directory, the full host-side flow for reproducing the final model is:
+
+\begin{lstlisting}[language=bash]
+python3 src/train.py --config configs/train_32x13.yaml
+./scripts/tidl82_export_compile.sh configs/compile.yaml
+python3 src/run_tidl.py --config configs/run_cpu_board.yaml
+\end{lstlisting}
+
+The important dependency between these steps is that the compile YAML does not define the model architecture or training recipe.  It only points the compiler to an already-exported ONNX file and to a representative calibration image set.
+
+\section{TIDL Compilation}
+
+The host-side TIDL compilation uses these effective settings:
+
+\begin{table}[H]
+\centering
+\caption{TIDL compilation settings.}
+\begin{tabular}{ll}
+\toprule
+Option & Value \\
+\midrule
+Platform & J7 \\
+Version & 8.2 \\
+Provider & \texttt{TIDLCompilationProvider} \\
+Tensor bits & 8 \\
+Accuracy level & 1 \\
+Calibration frames & 128 \\
+Max subgraphs & 16 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+For this model, the one-command wrapper eventually calls:
+
+\begin{lstlisting}[language=bash]
+python3 tools/compile_tidl.py --config models/square_seg_32x13/configs/compile.yaml
+\end{lstlisting}
+
+The one-command wrapper first exports the ONNX model on the host and then launches the TIDL compile step. The compile stage still consumes an ONNX model that was already exported; it does not recreate the training run or choose the saved model state by itself.
+
+The effective provider stack during compilation is:
+
+\begin{lstlisting}[language=Python]
+providers = ['TIDLCompilationProvider', 'CPUExecutionProvider']
+\end{lstlisting}
+
+The important provider options are:
+
+\begin{lstlisting}[language=Python]
+delegate_options = {
+    'tidl_tools_path': '/opt/tidl_tools',
+    'artifacts_folder': 'artifacts/tidl/model-artifacts/square_seg',
+    'platform': 'J7',
+    'version': '8.2',
+    'tensor_bits': 8,
+    'debug_level': 1,
+    'max_num_subgraphs': 16,
+    'deny_list': '',
+    'accuracy_level': 1,
+    'advanced_options:calibration_frames': 128,
+    'advanced_options:calibration_iterations': 5,
+    'advanced_options:add_data_convert_ops': 3,
+    'advanced_options:quantization_scale_type': 0,
+    'advanced_options:high_resolution_optimization': 0,
+    'advanced_options:pre_batchnorm_fold': 1,
+    'ti_internal_nc_flag': 1601,
+}
+\end{lstlisting}
+
+The compiler reported:
+
+\begin{lstlisting}
+Final number of subgraphs created are : 1, - Offloaded Nodes - 25, Total Nodes - 25
+ALL MODEL CHECK PASSED
+\end{lstlisting}
+
+The compiler also emitted a MSMC warning from \texttt{ti\_cnnperfsim.out}.  In this project the warning did not block runtime execution on the real BeagleBone AI-64, but it should still be tracked as a deployment risk.
+
+\section{Final Deploy Package}
+
+The final deploy package is:
+
+\begin{lstlisting}
+artifacts/square_seg_32x13_tidl82_final.tar.gz
+\end{lstlisting}
+
+Its relevant content is:
+
+\begin{lstlisting}
+model.onnx
+run_tidl.py
+config_utils.py
+configs/run_cpu_board.yaml
+configs/run_tidl.yaml
+test_images/img_0001_image.tif
+artifacts/tidl/model-artifacts/square_seg/*
+\end{lstlisting}
+
+The final local TIDL artifact folder is:
+
+\begin{lstlisting}
+artifacts/tidl/model-artifacts/square_seg_32x13_final
+\end{lstlisting}
+
+Copy and extract the package on the board:
+
+\begin{lstlisting}[language=bash]
+scp artifacts/square_seg_32x13_tidl82_final.tar.gz debian@192.168.7.2:/home/debian/
+ssh debian@192.168.7.2
+cd /home/debian
+rm -rf square_seg_tidl_final_yaml
+mkdir -p square_seg_tidl_final_yaml
+tar -xzf square_seg_32x13_tidl82_final.tar.gz -C square_seg_tidl_final_yaml
+cd square_seg_tidl_final_yaml
+\end{lstlisting}
+
+The archive extraction can emit timestamp warnings when the board clock is behind the host clock.  Those warnings do not affect inference.
+
+\section{Board-Side Commands}
+
+After copying or extracting the final package on the board, the short commands inside the deployed package are:
+
+\begin{lstlisting}[language=bash]
+python3 run_tidl.py --config configs/run_cpu_board.yaml
+sudo python3 run_tidl.py --config configs/run_tidl.yaml
+\end{lstlisting}
+
+These exact YAML-based commands were tested successfully on the BeagleBone AI-64.  The TIDL run log contained:
+
+\begin{lstlisting}
+libtidl_onnxrt_EP loaded
+Final number of subgraphs created are : 1, - Offloaded Nodes - 25, Total Nodes - 25
+\end{lstlisting}
+
+\section{Measured CPU versus TIDL Results}
+
+All board measurements in this section use \texttt{img\_0001\_image.tif}, the corresponding binary label, and the same exported ONNX model.
+
+\begin{table}[H]
+\centering
+\caption{Board accuracy and latency for the final 32x13 model.}
+\begin{tabular}{lrrrrr}
+\toprule
+Provider & Threshold & IoU & Dice & Mean time & Median time \\
+\midrule
+CPUExecutionProvider & 0.01 & 0.998403 & 0.999200 & 416.24 ms & 416.33 ms \\
+TIDLExecutionProvider & 0.99 & 0.993641 & 0.996808 & 1.91 ms & 1.98 ms \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The measured speedup is approximately:
+
+\[
+\frac{416.24\ \mathrm{ms}}{1.91\ \mathrm{ms}} \approx 217.6\times
+\]
+
+The TIDL benchmark data for the measured run indicates roughly $1.43$ ms of subgraph processing time between \texttt{ts:subgraph\_logits\_proc\_start} and \texttt{ts:subgraph\_logits\_proc\_end}.  The remaining wall time comes from copies and runtime overhead.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.96\linewidth]{cpu_tidl_metrics_32x13.png}
+\caption{CPU versus TIDL latency and IoU on the measured BeagleBone AI-64 sample.}
+\label{fig:metrics}
+\end{figure}
+
+\section{Qualitative Result}
+
+Figure~\ref{fig:qualitative} compares the input image, ground-truth mask, CPU mask, TIDL mask, and a TIDL error map.  In the error map, green pixels are true positives, red pixels are false positives, and blue pixels are false negatives.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.98\linewidth]{qualitative_grid_32x13.png}
+\caption{Qualitative comparison of CPU and TIDL outputs for the final model.}
+\label{fig:qualitative}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.98\linewidth]{qualitative_cpu_tidl_32x13.png}
+\caption{Wide qualitative view with the same CPU and TIDL masks.}
+\label{fig:qualitative-wide}
+\end{figure}
+
+\section{Why This Model Was Chosen}
+
+The best floating-point model was not the best deployed TIDL model.  The final decision was made using the actual TIDL output on the board.
+
+\begin{table}[H]
+\centering
+\caption{Candidate comparison on the same board sample after TIDL quantization.}
+\begin{tabular}{lrrr}
+\toprule
+Candidate & Offloaded nodes & Best TIDL threshold & TIDL IoU \\
+\midrule
+32 channels, 15 layers, INT8 & 29 & 0.50 & 0.913738 \\
+32 channels, 15 layers, logit L2 & 29 & 0.75 & 0.953822 \\
+32 channels, 13 layers, final & 25 & 0.99 & 0.993641 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.9\linewidth]{candidate_iou_comparison.png}
+\caption{TIDL IoU comparison among tested model candidates.}
+\label{fig:candidates}
+\end{figure}
+
+\section{Recommended Usage}
+
+If the goal is to reproduce the final deployed model from scratch, use this order:
+
+\begin{enumerate}
+\item On the host, train the selected candidate:
+\begin{lstlisting}[language=bash]
+python3 src/train.py --config configs/train_32x13.yaml
+\end{lstlisting}
+\item On the host, export the trained model state to ONNX:
+\begin{lstlisting}[language=bash]
+python3 src/export_onnx.py --config configs/export.yaml
+\end{lstlisting}
+\item On the host, compile the exported ONNX into TIDL artifacts:
+\begin{lstlisting}[language=bash]
+./scripts/tidl82_onnx_compile.sh configs/compile.yaml
+\end{lstlisting}
+\item Deploy \path{artifacts/square_seg_32x13_tidl82_final.tar.gz} to the board.
+\item On the board, run CPU inference:
+\begin{lstlisting}[language=bash]
+python3 run_tidl.py --config configs/run_cpu_board.yaml
+\end{lstlisting}
+\item On the board, run TIDL inference:
+\begin{lstlisting}[language=bash]
+sudo python3 run_tidl.py --config configs/run_tidl.yaml
+\end{lstlisting}
+\end{enumerate}
+
+If you are reusing the already released final model state and ONNX file, the training step can be skipped and the workflow starts at export or compile, depending on which artifacts you already have.
+
+\section{Conclusion}
+
+The final 32-channel, 13-layer convolutional model is the best current deployment choice because it preserves high mask accuracy after TIDL INT8 quantization while keeping full graph offload.  The measured TIDL path is about $217.6\times$ faster than CPU ONNX Runtime on the BeagleBone AI-64 for the measured sample, while the IoU remains very close to the CPU reference.
+
+\end{document}

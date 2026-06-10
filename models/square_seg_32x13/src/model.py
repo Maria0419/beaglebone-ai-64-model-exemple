@@ -47,5 +47,53 @@ class SquareSegModel(nn.Module):
         return self.net(x)
 
 
-def build_model(channels=32, layers=13, kernel_size=3):
-    return SquareSegModel(channels=channels, layers=layers, kernel_size=kernel_size)
+def build_square_seg_model(params=None):
+    params = dict(params or {})
+    return SquareSegModel(
+        channels=params.get("channels", 32),
+        layers=params.get("layers", 13),
+        kernel_size=params.get("kernel_size", 3),
+    )
+
+
+MODEL_BUILDERS = {
+    "square_seg": build_square_seg_model,
+}
+
+
+def normalize_model_config(model_config=None, **legacy_params):
+    if model_config is None:
+        legacy_params = {key: value for key, value in legacy_params.items() if value is not None}
+        return {
+            "name": "square_seg",
+            "params": legacy_params,
+        }
+
+    if not isinstance(model_config, dict):
+        raise TypeError("model config must be a mapping")
+
+    model_name = model_config.get("name")
+    if not model_name:
+        raise ValueError("model config must define a non-empty 'name'")
+
+    params = model_config.get("params", {})
+    if params is None:
+        params = {}
+    if not isinstance(params, dict):
+        raise TypeError("model.params must be a mapping")
+
+    return {
+        "name": model_name,
+        "params": params,
+    }
+
+
+def build_model(model_config=None, **legacy_params):
+    model_config = normalize_model_config(model_config, **legacy_params)
+    model_name = model_config["name"]
+
+    if model_name not in MODEL_BUILDERS:
+        supported = ", ".join(sorted(MODEL_BUILDERS))
+        raise ValueError(f"unsupported model '{model_name}'. Supported models: {supported}")
+
+    return MODEL_BUILDERS[model_name](model_config["params"])

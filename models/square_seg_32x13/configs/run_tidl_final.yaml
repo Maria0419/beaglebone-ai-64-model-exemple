@@ -5,16 +5,16 @@ run:
   provider: tidl
 
   # Promoted ONNX copied into the example package.
-  onnx: ../artifacts/model.onnx
+  onnx: ../outputs/model.onnx
 
   # Example input image. Replace it with the image you want to test.
   image: ../test_images/img_0001_image.tif
 
   # Output mask path inside the example package.
-  output: ../artifacts/outputs/tidl_mask.png
+  output: ../outputs/tidl_mask.png
 
   # Folder containing the compiled TIDL artifacts.
-  artifacts_folder: ../artifacts/tidl/model-artifacts/square_seg
+  artifacts_folder: ../outputs/tidl/model-artifacts/square_seg
 
   # Board runtime location for the TIDL shared libraries on the validated image.
   tidl_tools_path: /usr/lib

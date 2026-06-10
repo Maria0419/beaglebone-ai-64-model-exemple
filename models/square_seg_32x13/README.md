@@ -10,13 +10,23 @@ Model summary:
 - Opset: `11`.
 - TIDL compile: INT8, TIDL 8.2.
 
-Included artifacts:
+Included outputs:
 
-- `artifacts/model.onnx`: exported ONNX model.
-- `artifacts/checkpoints/best.pt`: PyTorch checkpoint used for export.
-- `artifacts/tidl/model-artifacts/square_seg/`: compiled TIDL artifacts.
+- `outputs/model.onnx`: exported ONNX model.
+- `outputs/model.pt`: PyTorch model state used for export in the standard example workflow.
+- `outputs/tidl/model-artifacts/square_seg/`: compiled TIDL outputs.
 - `test_images/img_0001_image.tif`: one test image.
-- `artifacts/outputs/`: example CPU/TIDL masks from previous board validation.
+- `outputs/`: exported PyTorch model state, ONNX, metrics, and example CPU/TIDL masks.
+
+## Train the Example Model
+
+From this folder:
+
+```bash
+python3 src/train.py --config configs/train.yaml
+```
+
+Edit `channels`, `layers`, and `kernel_size` inside `configs/train.yaml` to change which model the example trains.
 
 ## Re-export ONNX
 

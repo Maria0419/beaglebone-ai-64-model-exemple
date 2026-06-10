@@ -5,13 +5,13 @@ run:
   provider: cpu
 
   # Promoted ONNX copied into the example package.
-  onnx: ../artifacts/model.onnx
+  onnx: ../outputs/model.onnx
 
   # Example input image. Replace it with the image you want to test.
   image: ../test_images/img_0001_image.tif
 
   # Output mask path inside the example package.
-  output: ../artifacts/outputs/cpu_mask.png
+  output: ../outputs/cpu_mask.png
 
   # Threshold validated for CPU inference on this model.
   threshold: 0.01

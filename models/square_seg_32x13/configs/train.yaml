@@ -6,14 +6,14 @@ train_dir: /home/maria/Project/ia/models/data/data/train
 test_dir: /home/maria/Project/ia/models/data/data/test
 
 # Root output directory used by this example model.
-# Training writes checkpoints and metrics here.
-artifacts_dir: artifacts
+# Training writes model.pt and metrics here.
+artifacts_dir: outputs
 
 # Input tensor size expected by the model and by the exported ONNX graph.
 image_height: 128
 image_width: 128
 
-# Model architecture. Keep these aligned with the checkpoint you plan to export.
+# Model architecture. Edit these values in this file to change which model the example trains.
 channels: 32
 layers: 13
 kernel_size: 3

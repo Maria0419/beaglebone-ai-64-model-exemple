@@ -52,11 +52,11 @@ def main():
     if config_path is not None:
         config_path, _, cfg = load_config_with_base(config_path, "run")
 
-    onnx_default = cfg.get("onnx", "artifacts/model.onnx")
+    onnx_default = cfg.get("onnx", "outputs/model.onnx")
     image_default = cfg.get("image")
     output_default = cfg.get("output", "outputs/mask.png")
     provider = args.provider or cfg.get("provider", "tidl")
-    artifacts_folder_default = cfg.get("artifacts_folder", "artifacts/tidl/model-artifacts/square_seg")
+    artifacts_folder_default = cfg.get("artifacts_folder", "outputs/tidl/model-artifacts/square_seg")
     tidl_tools_default = cfg.get("tidl_tools_path") or os.environ.get("TIDL_TOOLS_PATH", "/usr/lib")
     height = int(args.height or cfg.get("height") or cfg.get("image_height", 128))
     width = int(args.width or cfg.get("width") or cfg.get("image_width", 128))

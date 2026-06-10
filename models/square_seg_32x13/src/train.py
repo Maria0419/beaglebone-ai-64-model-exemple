@@ -95,9 +95,8 @@ def main():
     config_path = Path(args.config)
     cfg = yaml.safe_load(config_path.read_text())
 
-    artifacts_dir = Path(cfg["artifacts_dir"])
-    checkpoints_dir = artifacts_dir / "checkpoints"
-    checkpoints_dir.mkdir(parents=True, exist_ok=True)
+    outputs_dir = Path(cfg["artifacts_dir"])
+    outputs_dir.mkdir(parents=True, exist_ok=True)
 
     image_height = cfg["image_height"]
     image_width = cfg["image_width"]
@@ -179,14 +178,14 @@ def main():
         history.append(row)
         print(json.dumps(row, sort_keys=True), flush=True)
 
-        checkpoint = {
+        model_state = {
             "model_state": model.state_dict(),
             "config": cfg,
             "epoch": epoch,
             "metrics": row,
             "history": history,
         }
-        torch.save(checkpoint, checkpoints_dir / "last.pt")
+        torch.save(model_state, outputs_dir / "model.pt")
 
         if test_metrics["iou"] > best_iou:
             best_iou = float(test_metrics["iou"])
@@ -202,7 +201,7 @@ def main():
                 }, sort_keys=True), flush=True)
                 break
 
-    (artifacts_dir / "metrics.json").write_text(json.dumps(history, indent=2))
+    (outputs_dir / "metrics.json").write_text(json.dumps(history, indent=2))
 
 
 if __name__ == "__main__":

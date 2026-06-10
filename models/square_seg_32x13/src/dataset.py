@@ -17,8 +17,8 @@ def _load_mask(path):
 class SquareSegDataset(Dataset):
     def __init__(self, root, image_height=128, image_width=128, augment=False):
         self.root = Path(root)
-        self.image_height = int(image_height)
-        self.image_width = int(image_width)
+        self.image_height = image_height
+        self.image_width = image_width
         self.augment = augment
 
         self.image_files = sorted(self.root.rglob("*_image.tif"))

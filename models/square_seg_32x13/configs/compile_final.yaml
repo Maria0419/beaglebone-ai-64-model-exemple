@@ -1,11 +1,29 @@
+# Final host-side TIDL compile preset for the exported square-segmentation ONNX model.
+# `train_config` loads shared fields such as image_height and image_width from train.yaml.
+# This file does not describe training; it only tells the compiler which exported ONNX
+# model to import, which images to use for calibration, and where to write the artifacts.
 train_config: train.yaml
 
 compile:
+  # ONNX file produced by:
+  #   python3 src/export_onnx.py --config models/square_seg_32x13/configs/export_final.yaml
   onnx: ../artifacts/model.onnx
+
+  # Destination recreated on each compile unless --keep-artifacts is passed.
   artifacts_folder: ../artifacts/tidl/model-artifacts/square_seg
+
+  # Path to the extracted TIDL 8.2 host tools inside the compiler container.
   tidl_tools_path: /opt/tidl_tools
+
+  # Representative input images used for INT8 calibration. Labels are not read here.
   calibration_dir: /home/maria/Project/ia/models/data/data/train
+
+  # Pattern searched recursively under calibration_dir.
   calibration_glob: "*_image.tif"
+
+  # Number of calibration images to feed through TIDLCompilationProvider.
   calibration_frames: 128
+
+  # Quantization settings validated for the final board deployment.
   tidl_tensor_bits: 8
   tidl_accuracy_level: 1

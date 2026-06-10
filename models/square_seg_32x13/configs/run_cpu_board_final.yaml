@@ -1,8 +1,21 @@
+# Board-package CPU inference preset.
+# Relative paths are resolved from this YAML file inside the deployed example package.
 run:
+  # Use CPUExecutionProvider only.
   provider: cpu
+
+  # Promoted ONNX copied into the example package.
   onnx: ../artifacts/model.onnx
+
+  # Example input image. Replace it with the image you want to test.
   image: ../test_images/img_0001_image.tif
+
+  # Output mask path inside the example package.
   output: ../artifacts/outputs/cpu_mask.png
+
+  # Threshold validated for CPU inference on this model.
   threshold: 0.01
+
+  # Explicit resize target used before inference.
   height: 128
   width: 128

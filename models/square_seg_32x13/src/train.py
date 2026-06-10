@@ -1,46 +1,18 @@
-from __future__ import annotations
-
 import argparse
 import json
-from contextlib import nullcontext
 from pathlib import Path
 
-import numpy as np
 import torch
 import yaml
-from PIL import Image
-from torch import nn
 from torch.utils.data import DataLoader
 from tqdm.auto import tqdm
 
 from dataset import SquareSegDataset
-from model import build_model
+from model import DiceBCELoss, build_model
 
 
-class DiceLoss(nn.Module):
-    def forward(self, logits: torch.Tensor, masks: torch.Tensor) -> torch.Tensor:
-        probs = torch.sigmoid(logits)
-        intersection = (probs * masks).sum(dim=(1, 2, 3))
-        denominator = probs.sum(dim=(1, 2, 3)) + masks.sum(dim=(1, 2, 3))
-        return 1.0 - ((2.0 * intersection + 1.0) / (denominator + 1.0)).mean()
 
-
-class DiceBCELoss(nn.Module):
-    def __init__(self, bce_weight: float = 1.0, pos_weight: float = 1.0) -> None:
-        super().__init__()
-        self.dice = DiceLoss()
-        self.bce_weight = float(bce_weight)
-        self.register_buffer("pos_weight", torch.tensor([float(pos_weight)], dtype=torch.float32))
-
-    def forward(self, logits: torch.Tensor, masks: torch.Tensor) -> torch.Tensor:
-        loss = self.dice(logits, masks)
-        if self.bce_weight <= 0.0:
-            return loss
-        bce = nn.functional.binary_cross_entropy_with_logits(logits, masks, pos_weight=self.pos_weight)
-        return loss + self.bce_weight * bce
-
-
-def dice_iou_from_logits(logits: torch.Tensor, masks: torch.Tensor, threshold: float) -> tuple[float, float]:
+def compute_segmentation_metrics(logits, masks, threshold):
     predictions = (torch.sigmoid(logits) > threshold).float()
     masks = (masks > 0.5).float()
     intersection = (predictions * masks).sum(dim=(1, 2, 3))
@@ -52,35 +24,19 @@ def dice_iou_from_logits(logits: torch.Tensor, masks: torch.Tensor, threshold: f
     return dice, iou
 
 
-def save_prediction_samples(model: nn.Module, dataset: SquareSegDataset, out_dir: Path, device: torch.device, threshold: float) -> None:
-    out_dir.mkdir(parents=True, exist_ok=True)
-    model.eval()
-    sample_count = min(8, len(dataset))
-
-    with torch.no_grad():
-        for index in range(sample_count):
-            image, mask = dataset[index]
-            logits = model(image.unsqueeze(0).to(device)).cpu()
-            prediction = (torch.sigmoid(logits)[0, 0].numpy() > threshold).astype(np.uint8) * 255
-            Image.fromarray((image[0].numpy() * 255).astype(np.uint8)).save(out_dir / f"{index:03d}_image.png")
-            Image.fromarray((mask[0].numpy() * 255).astype(np.uint8)).save(out_dir / f"{index:03d}_label.png")
-            Image.fromarray(prediction).save(out_dir / f"{index:03d}_pred.png")
-
 
 def run_epoch(
-    model: nn.Module,
-    loader: DataLoader,
-    criterion: nn.Module,
-    device: torch.device,
-    threshold: float,
-    use_amp: bool,
-    epoch: int,
-    total_epochs: int,
-    stage: str,
-    optimizer: torch.optim.Optimizer | None = None,
-    scaler: torch.amp.GradScaler | None = None,
-    max_grad_norm: float = 0.0,
-) -> dict[str, float]:
+    model,
+    loader,
+    criterion,
+    device,
+    threshold,
+    epoch,
+    total_epochs,
+    stage,
+    optimizer=None,
+    max_grad_norm=0.0,
+):
     is_training = optimizer is not None
     model.train(mode=is_training)
 
@@ -90,37 +46,28 @@ def run_epoch(
     batch_count = 0
 
     progress = tqdm(loader, desc=f"Epoch {epoch}/{total_epochs} [{stage}]", leave=False)
+    
     for images, masks in progress:
-        images = images.to(device, non_blocking=True)
-        masks = masks.to(device, non_blocking=True)
+        images = images.to(device)
+        masks = masks.to(device)
 
         if is_training:
             optimizer.zero_grad(set_to_none=True)
 
         grad_context = torch.enable_grad() if is_training else torch.no_grad()
-        autocast_context = (
-            torch.autocast(device_type=device.type, dtype=torch.float16)
-            if use_amp and device.type == "cuda"
-            else nullcontext()
-        )
 
         with grad_context:
-            with autocast_context:
-                logits = model(images)
-                loss = criterion(logits, masks)
+            logits = model(images)
+            loss = criterion(logits, masks)
 
             if is_training:
-                assert optimizer is not None
-                assert scaler is not None
-                scaler.scale(loss).backward()
+                loss.backward()
                 if max_grad_norm > 0.0:
-                    scaler.unscale_(optimizer)
                     torch.nn.utils.clip_grad_norm_(model.parameters(), max_grad_norm)
-                scaler.step(optimizer)
-                scaler.update()
+                optimizer.step()
 
         logits = logits.detach().float()
-        dice, iou = dice_iou_from_logits(logits, masks, threshold)
+        dice, iou = compute_segmentation_metrics(logits, masks, threshold)
         total_loss += float(loss.item())
         total_dice += dice
         total_iou += iou
@@ -140,10 +87,9 @@ def run_epoch(
     }
 
 
-def main() -> None:
+def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", default="configs/train.yaml")
-    parser.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
     args = parser.parse_args()
 
     config_path = Path(args.config)
@@ -151,38 +97,31 @@ def main() -> None:
 
     artifacts_dir = Path(cfg["artifacts_dir"])
     checkpoints_dir = artifacts_dir / "checkpoints"
-    samples_dir = artifacts_dir / "samples"
     checkpoints_dir.mkdir(parents=True, exist_ok=True)
 
-    expected_size = (int(cfg["image_height"]), int(cfg["image_width"]))
-    train_dataset = SquareSegDataset(cfg["train_dir"], expected_size=expected_size, augment=bool(cfg.get("augment", False)))
-    test_dataset = SquareSegDataset(cfg["test_dir"], expected_size=expected_size, augment=False)
+    image_height = cfg["image_height"]
+    image_width = cfg["image_width"]
+    train_dataset = SquareSegDataset(
+        cfg["train_dir"],
+        image_height=image_height,
+        image_width=image_width,
+        augment=bool(cfg.get("augment", False)),
+    )
+    test_dataset = SquareSegDataset(
+        cfg["test_dir"],
+        image_height=image_height,
+        image_width=image_width,
+        augment=False,
+    )
 
     print(f"Training data: {len(train_dataset)}  Testing data: {len(test_dataset)}")
 
-    device = torch.device(args.device)
-    train_loader = DataLoader(
-        train_dataset,
-        batch_size=int(cfg["batch_size"]),
-        shuffle=True,
-        num_workers=int(cfg["num_workers"]),
-        pin_memory=device.type == "cuda",
-        persistent_workers=int(cfg["num_workers"]) > 0,
-    )
-    test_loader = DataLoader(
-        test_dataset,
-        batch_size=int(cfg.get("eval_batch_size", cfg["batch_size"])),
-        shuffle=False,
-        num_workers=int(cfg["num_workers"]),
-        pin_memory=device.type == "cuda",
-        persistent_workers=int(cfg["num_workers"]) > 0,
-    )
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    
+    train_loader = DataLoader(train_dataset, batch_size=cfg["batch_size"], shuffle=True, num_workers=cfg["num_workers"])
+    test_loader = DataLoader(test_dataset, batch_size=cfg.get("eval_batch_size", cfg["batch_size"]), shuffle=False, num_workers=cfg["num_workers"])
 
-    model = build_model(
-        channels=int(cfg["channels"]),
-        layers=int(cfg["layers"]),
-        kernel_size=int(cfg["kernel_size"]),
-    ).to(device)
+    model = build_model(channels=cfg["channels"], layers=cfg["layers"], kernel_size=cfg["kernel_size"]).to(device)
 
     criterion = DiceBCELoss(
         bce_weight=float(cfg.get("bce_loss_weight", 1.0)),
@@ -191,19 +130,16 @@ def main() -> None:
     optimizer = torch.optim.Adam(
         model.parameters(),
         lr=float(cfg["learning_rate"]),
-        weight_decay=float(cfg.get("weight_decay", 0.0)),
     )
 
-    use_amp = bool(cfg.get("amp", True)) and device.type == "cuda"
-    scaler = torch.amp.GradScaler("cuda", enabled=use_amp)
-    threshold = float(cfg["threshold"])
-    max_epochs = int(cfg["epochs"])
-    patience = max(1, int(cfg.get("early_stopping_patience", 5)))
+    threshold = 0.5
+    max_epochs = cfg["epochs"]
+    patience = max(1, cfg.get("early_stopping_patience", 5))
     max_grad_norm = float(cfg.get("max_grad_norm", 0.0))
 
     best_iou = -1.0
     epochs_without_improvement = 0
-    history: list[dict[str, object]] = []
+    history = []
 
     for epoch in range(1, max_epochs + 1):
         train_metrics = run_epoch(
@@ -212,12 +148,10 @@ def main() -> None:
             criterion=criterion,
             device=device,
             threshold=threshold,
-            use_amp=use_amp,
             epoch=epoch,
             total_epochs=max_epochs,
             stage="train",
             optimizer=optimizer,
-            scaler=scaler,
             max_grad_norm=max_grad_norm,
         )
         test_metrics = run_epoch(
@@ -226,13 +160,12 @@ def main() -> None:
             criterion=criterion,
             device=device,
             threshold=threshold,
-            use_amp=use_amp,
             epoch=epoch,
             total_epochs=max_epochs,
             stage="test",
         )
 
-        row: dict[str, object] = {
+        row = {
             "epoch": epoch,
             "train_loss": train_metrics["loss"],
             "train_dice": train_metrics["dice"],
@@ -248,7 +181,7 @@ def main() -> None:
 
         checkpoint = {
             "model_state": model.state_dict(),
-            "config": {**cfg, "threshold": threshold},
+            "config": cfg,
             "epoch": epoch,
             "metrics": row,
             "history": history,
@@ -258,8 +191,6 @@ def main() -> None:
         if test_metrics["iou"] > best_iou:
             best_iou = float(test_metrics["iou"])
             epochs_without_improvement = 0
-            torch.save(checkpoint, checkpoints_dir / "best.pt")
-            save_prediction_samples(model, test_dataset, samples_dir, device, threshold)
         else:
             epochs_without_improvement += 1
             if epochs_without_improvement >= patience:

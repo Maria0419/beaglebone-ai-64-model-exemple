@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import argparse
 import json
 import os
@@ -12,7 +10,7 @@ from PIL import Image
 from config_utils import load_config_with_base, resolve_path
 
 
-def preprocess(path: Path, height: int, width: int) -> np.ndarray:
+def preprocess(path, height, width):
     image = Image.open(path).convert("L")
     if image.size != (width, height):
         image = image.resize((width, height), Image.Resampling.BILINEAR)
@@ -20,12 +18,12 @@ def preprocess(path: Path, height: int, width: int) -> np.ndarray:
     return array.reshape(1, 1, height, width)
 
 
-def sigmoid(x: np.ndarray) -> np.ndarray:
+def sigmoid(x):
     x = np.clip(x, -80.0, 80.0)
     return 1.0 / (1.0 + np.exp(-x))
 
 
-def get_benchmark(session: ort.InferenceSession) -> dict[str, int | float]:
+def get_benchmark(session):
     if not hasattr(session, "get_TI_benchmark_data"):
         return {}
     try:
@@ -35,7 +33,7 @@ def get_benchmark(session: ort.InferenceSession) -> dict[str, int | float]:
     return {str(key): int(value) if isinstance(value, (np.integer, int)) else float(value) for key, value in raw.items()}
 
 
-def main() -> None:
+def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", default=None)
     parser.add_argument("--onnx", default=None)
@@ -49,7 +47,7 @@ def main() -> None:
     parser.add_argument("--threshold", type=float, default=None)
     args = parser.parse_args()
 
-    cfg: dict = {}
+    cfg = {}
     config_path = Path(args.config) if args.config else None
     if config_path is not None:
         config_path, _, cfg = load_config_with_base(config_path, "run")
@@ -80,8 +78,6 @@ def main() -> None:
     if onnx_path is None or image_path is None or output_path is None or artifacts_folder is None or tidl_tools_path is None:
         raise ValueError("onnx, image, output, artifacts_folder, and tidl_tools_path must resolve to real paths")
 
-    providers: list[str]
-    provider_options: list[dict[str, str]]
     if provider == "cpu":
         providers = ["CPUExecutionProvider"]
         provider_options = [{}]

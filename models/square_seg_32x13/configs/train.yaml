@@ -6,7 +6,7 @@ train_dir: /home/maria/Project/ia/models/data/data/train
 test_dir: /home/maria/Project/ia/models/data/data/test
 
 # Root output directory used by this example model.
-# Training writes checkpoints, metrics, and sample masks here.
+# Training writes checkpoints and metrics here.
 artifacts_dir: artifacts
 
 # Input tensor size expected by the model and by the exported ONNX graph.
@@ -23,10 +23,8 @@ epochs: 8
 batch_size: 192
 eval_batch_size: 256
 learning_rate: 0.001
-weight_decay: 0.000001
 max_grad_norm: 1.0
 num_workers: 4
-amp: true
 augment: false
 
 # Dice remains the base loss. BCEWithLogitsLoss is added on top to stabilize
@@ -34,8 +32,6 @@ augment: false
 bce_loss_weight: 1.0
 pos_weight: 4.0
 
-# Validation threshold used to compute Dice and IoU during training.
-threshold: 0.5
 
 # Stop training after this many epochs without IoU improvement on the validation set.
 early_stopping_patience: 5

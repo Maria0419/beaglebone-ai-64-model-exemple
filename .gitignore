@@ -9,6 +9,10 @@ __pycache__/
 *.out
 .DS_Store
 **/artifacts/tidl/model-artifacts/*/tempDir/
+*.pt
+*.png
+*.json
+
 
 # Local helper tools
 tools/gh/

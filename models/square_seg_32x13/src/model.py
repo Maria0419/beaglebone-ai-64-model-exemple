@@ -1,17 +1,38 @@
-from __future__ import annotations
-
 import torch
 from torch import nn
+
+
+class DiceLoss(nn.Module):
+    def forward(self, logits, masks):
+        probs = torch.sigmoid(logits)
+        intersection = (probs * masks).sum(dim=(1, 2, 3))
+        denominator = probs.sum(dim=(1, 2, 3)) + masks.sum(dim=(1, 2, 3))
+        return 1.0 - ((2.0 * intersection + 1.0) / (denominator + 1.0)).mean()
+
+
+class DiceBCELoss(nn.Module):
+    def __init__(self, bce_weight=1.0, pos_weight=1.0):
+        super().__init__()
+        self.dice = DiceLoss()
+        self.bce_weight = float(bce_weight)
+        self.register_buffer("pos_weight", torch.tensor([float(pos_weight)], dtype=torch.float32))
+
+    def forward(self, logits, masks):
+        loss = self.dice(logits, masks)
+        if self.bce_weight <= 0.0:
+            return loss
+        bce = nn.functional.binary_cross_entropy_with_logits(logits, masks, pos_weight=self.pos_weight)
+        return loss + self.bce_weight * bce
 
 
 class SquareSegModel(nn.Module):
     """Fully convolutional binary segmentation model."""
 
-    def __init__(self, channels: int = 32, layers: int = 13, kernel_size: int = 3) -> None:
+    def __init__(self, channels=32, layers=13, kernel_size=3):
         super().__init__()
 
         padding = kernel_size // 2
-        blocks: list[nn.Module] = []
+        blocks = []
         in_channels = 1
 
         for _ in range(layers - 1):
@@ -22,9 +43,9 @@ class SquareSegModel(nn.Module):
         blocks.append(nn.Conv2d(channels, 1, kernel_size=1, bias=True))
         self.net = nn.Sequential(*blocks)
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    def forward(self, x):
         return self.net(x)
 
 
-def build_model(channels: int = 32, layers: int = 13, kernel_size: int = 3) -> SquareSegModel:
+def build_model(channels=32, layers=13, kernel_size=3):
     return SquareSegModel(channels=channels, layers=layers, kernel_size=kernel_size)

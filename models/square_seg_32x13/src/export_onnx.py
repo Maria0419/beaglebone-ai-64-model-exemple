@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import argparse
 import json
 from pathlib import Path
@@ -14,7 +12,7 @@ from model import build_model
 ALLOWED_OPS = {"Conv", "Relu"}
 
 
-def main() -> None:
+def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", default="configs/train.yaml")
     parser.add_argument("--checkpoint", default=None)

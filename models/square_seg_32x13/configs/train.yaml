@@ -23,22 +23,22 @@ epochs: 8
 batch_size: 192
 eval_batch_size: 256
 learning_rate: 0.001
-min_learning_rate: 0.00001
 weight_decay: 0.000001
 max_grad_norm: 1.0
 num_workers: 4
 amp: true
+augment: false
 
-# Validation threshold used for CPU-side mask binarization during training.
+# Dice remains the base loss. BCEWithLogitsLoss is added on top to stabilize
+# sparse foreground training; pos_weight emphasizes positive pixels.
+bce_loss_weight: 1.0
+pos_weight: 4.0
+
+# Validation threshold used to compute Dice and IoU during training.
 threshold: 0.5
 
-# Threshold sweep evaluated during validation when comparing candidate checkpoints.
-thresholds: [0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95]
-
-# Loss weighting for the positive class and for BCE vs Dice.
-pos_weight: 4.0
-bce_loss_weight: 1.0
-dice_loss_weight: 3.0
+# Stop training after this many epochs without IoU improvement on the validation set.
+early_stopping_patience: 5
 
 # Default number of images to use later during TIDL calibration.
 calibration_frames: 128

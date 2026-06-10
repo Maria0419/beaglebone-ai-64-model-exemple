@@ -63,7 +63,7 @@ The square segmentation example already includes `model.onnx` and precompiled TI
 ./scripts/tidl82_export_compile.sh models/square_seg_32x13/configs/compile.yaml
 ```
 
-By default this wrapper infers the sibling `export.yaml` next to the compile YAML, runs the host-side ONNX export first, and then calls the Docker-based TIDL compile wrapper. The compile YAML still selects the calibration images, input size, and output artifact directory. If `calibration_dir` is an absolute host path, the wrapper mounts it read-only into the container automatically.
+This wrapper infers the sibling `export.yaml`, runs the host-side ONNX export first, and then calls the Docker-based TIDL compile wrapper. The compile YAML still selects the calibration images, input size, and output artifact directory. If `calibration_dir` is an absolute host path, the wrapper mounts it read-only into the container automatically.
 
 ## Compile Another ONNX Model
 
@@ -85,5 +85,7 @@ For the included example, copy `models/square_seg_32x13/` to the board and run f
 python3 src/run_tidl.py --config configs/run_cpu_board.yaml
 sudo python3 src/run_tidl.py --config configs/run_tidl.yaml
 ```
+
+The inference script is YAML-driven and only takes `--config`. Before running it, edit the chosen YAML to point `image:` at the test image you want to run.
 
 The TIDL run should show `TIDLExecutionProvider` and one offloaded subgraph.

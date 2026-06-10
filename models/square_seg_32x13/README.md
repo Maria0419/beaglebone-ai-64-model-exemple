@@ -62,6 +62,8 @@ From this folder:
 python3 src/run_tidl.py --config configs/run_cpu_board.yaml
 ```
 
+The inference script is YAML-driven and only takes `--config`. Set the image path, output path, threshold, and provider behavior in the run YAML itself.
+
 ## Run TIDL on BeagleBone AI-64
 
 From this folder on the board:
@@ -69,6 +71,8 @@ From this folder on the board:
 ```bash
 sudo python3 src/run_tidl.py --config configs/run_tidl.yaml
 ```
+
+Before running either preset, update the `image:` field in the selected YAML if you want to test a different input image.
 
 Expected board behavior:
 

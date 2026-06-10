@@ -1,5 +1,6 @@
 # Board-package CPU inference preset.
 # Relative paths are resolved from this YAML file inside the deployed example package.
+# The inference script reads its runtime settings from this YAML; the only CLI argument is --config.
 run:
   # Use CPUExecutionProvider only.
   provider: cpu

@@ -1,5 +1,6 @@
 # Board-package TIDL inference preset.
 # Relative paths are resolved from this YAML file inside the deployed example package.
+# The inference script reads its runtime settings from this YAML; the only CLI argument is --config.
 run:
   # Use the TIDL execution provider on the board.
   provider: tidl

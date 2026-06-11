@@ -8,7 +8,7 @@ The generic part of this repository is the TIDL 8.2 compiler environment:
 - `scripts/tidl82_onnx_compile.sh`: generic Docker wrapper for TIDL 8.2 ONNX compilation.
 - `scripts/tidl82_export_compile.sh`: one-command wrapper that exports ONNX on the host and then runs the TIDL compile wrapper.
 - `tools/compile_tidl.py`: YAML-driven ONNX compile script.
-- `examples/compile_tidl82_template.yaml`: starting point for compiling another model.
+- `configs/compile_tidl82_template.yaml`: starting point for compiling another model.
 
 The model-specific part lives under `models/`:
 
@@ -70,7 +70,7 @@ This wrapper infers the sibling `export.yaml`, runs the host-side ONNX export fi
 Copy the template and edit it:
 
 ```bash
-cp examples/compile_tidl82_template.yaml configs/my_model_compile.yaml
+cp configs/compile_tidl82_template.yaml configs/my_model_compile.yaml
 # edit paths, input size, calibration_dir, calibration_glob, artifacts_folder
 ./scripts/tidl82_onnx_compile.sh configs/my_model_compile.yaml
 ```

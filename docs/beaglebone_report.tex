@@ -48,11 +48,7 @@ The source repository is available at \href{https://github.com/maria0419/beagleb
 
 \section{Flash the Correct Image to eMMC}
 
-Use the official BeagleBoard image: \href{https://www.beagleboard.org/distros/beaglebone-ai-64-xfce-2023-08-05-emmc-flasher}{BeagleBone AI-64 Debian 11.7 2023-08-05 10GB Xfce eMMC Flasher}.
-
-\begin{lstlisting}
-BeagleBoard.org Debian Bullseye Xfce Image 2023-08-05
-\end{lstlisting}
+Use the official BeagleBoard image: \href{https://www.beagleboard.org/distros/bbai64-11-7-2023-09-02-10gb-emmc-ti-edgeai-xfce-flasher}{bbai64-emmc-flasher-debian-11.7-xfce-edgeai-arm64-2023-08-05-10gb.img.xz}.
 
 This image was selected because it is the most up-to-date image that already includes the BeagleBone AI-64 EdgeAI/TIDL runtime compatible with the TIDL 8.2 workflow. The eMMC flashing procedure was as follows:
 
@@ -240,21 +236,6 @@ logits_tidl_net.bin
 logits_tidl_io_1.bin
 \end{lstlisting}
 
-
-\section{Build a TIDL-Compatible ONNX Graph}
-
-The most important engineering constraint is not just training accuracy.  The graph must be simple enough for TIDL 8.2 to compile and offload on the BeagleBone AI-64 runtime.  The practical rules used were:
-
-\begin{itemize}
-\item use fixed input shape in NCHW format, here \texttt{1x1x128x128},
-\item keep the output fixed and leave post-processing outside the graph,
-\item export logits or raw tensors instead of embedding thresholding in ONNX,
-\item avoid dynamic shape logic,
-\item avoid operators that commonly break offload or force partial CPU fallback.
-\end{itemize}
-
-For this project, the safe starting operator set was limited to \texttt{Conv} and \texttt{Relu}. In this case, the final ONNX graph also intentionally avoided operators such as \texttt{Resize}, \texttt{Upsample}, \texttt{ConvTranspose}, and \texttt{Sigmoid}. Sigmoid and threshold are applied in Python after inference. This keeps the model graph small and maximizes the chance that TIDL creates one fully offloaded subgraph.
-
 \section{Export ONNX with Opset 11}
 
 The export uses a fixed-shape dummy tensor and opset 11.  For PyTorch versions with the newer exporter, the legacy exporter can be forced when needed:
@@ -430,6 +411,14 @@ The packaged example includes \path{test_images/img_0001_image.tif} as a sample 
 \begin{lstlisting}[language=bash]
 python3 run_tidl.py --config configs/run_cpu_board.yaml
 sudo python3 run_tidl.py --config configs/run_tidl.yaml
+\end{lstlisting}
+
+From the host PC, the generated masks can be copied back for inspection with:
+
+\begin{lstlisting}[language=bash]
+mkdir -p models/square_seg_32x13/artifacts/board_results
+scp debian@192.168.7.2:~/square_seg_tidl_yaml/square_seg_32x13_tidl82/artifacts/cpu_mask.png models/square_seg_32x13/artifacts/board_results/
+scp debian@192.168.7.2:~/square_seg_tidl_yaml/square_seg_32x13_tidl82/artifacts/tidl_mask.png models/square_seg_32x13/artifacts/board_results/
 \end{lstlisting}
 
 These exact YAML-based commands were tested successfully on the BeagleBone AI-64.  The TIDL run log contained:

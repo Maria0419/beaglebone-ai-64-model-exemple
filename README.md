@@ -2,6 +2,8 @@
 
 Generic host-side tooling for compiling ONNX models for the BeagleBone AI-64 TIDL runtime, plus one working square-segmentation example model.
 
+The full report for this example is available at [docs/beaglebone_report.pdf](docs/beaglebone_report.pdf).
+
 The generic part of this repository is the TIDL 8.2 compiler environment:
 
 - `docker/tidl82/Dockerfile`: Ubuntu 18.04 / Python 3.6 / `onnxruntime_tidl 1.7.0` / `tidl_tools 08_02_00_01-rc1`.
